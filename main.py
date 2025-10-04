@@ -9,7 +9,6 @@ API_HASH = os.environ["API_HASH"]
 
 app = Client("rose_like_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-# Storage files
 RULES_FILE = "rules.json"
 WELCOME_FILE = "welcome.json"
 WARNS_FILE = "warns.json"
@@ -29,8 +28,6 @@ group_rules = load_json(RULES_FILE)
 welcome_msgs = load_json(WELCOME_FILE)
 warns = load_json(WARNS_FILE)
 filters_dict = load_json(FILTERS_FILE)
-
-# ---------------- COMMANDS ----------------
 
 @app.on_message(filters.command("start"))
 async def start(client, message):
@@ -244,9 +241,7 @@ async def auto_reply(_, m):
 @app.on_message(filters.command("stats") & filters.group)
 async def stats(_, m):
     members = await _.get_chat_members_count(m.chat.id)
-    admins = await _.get_chat_members(m.chat.id, filter="administrators")
-    admins_list = ", ".join([a.user.first_name for a in admins])
-    await m.reply(f"👥 Members: {members}\n🛡 Admins: {admins_list}")
+    await m.reply(f"👥 Members: {members}")
 
 @app.on_message(filters.command("info") & filters.group)
 async def info(_, m):
