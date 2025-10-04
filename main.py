@@ -1,21 +1,43 @@
 import os
+import json
 from pyrogram import Client, filters
 from pyrogram.types import ChatPermissions
 
-BOT_TOKEN = os.environ["8438358592:AAG1HhPeJVM7FXkUJTTspcKVQRZnPazURX4"]
-API_ID = int(os.environ["29091290"])
-API_HASH = os.environ["5e17bf0a5ed30289842f686647b48da5"]
+BOT_TOKEN = os.environ["BOT_TOKEN"]
+API_ID = int(os.environ["API_ID"])
+API_HASH = os.environ["API_HASH"]
 
-app = Client("management_bot", api_id=29091290, api_hash=5e17bf0a5ed30289842f686647b48da5, bot_token=8438358592:AAG1HhPeJVM7FXkUJTTspcKVQRZnPazURX4)
+app = Client("manager_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+
+RULES_FILE = "rules.json"
+
+# Load saved rules from file
+if os.path.exists(RULES_FILE):
+    with open(RULES_FILE, "r") as f:
+        group_rules = json.load(f)
+else:
+    group_rules = {}
 
 @app.on_message(filters.new_chat_members)
 async def welcome(client, message):
     for new_member in message.new_chat_members:
-        await message.reply_text(f"👋 Welcome, {new_member.first_name}!\nPlease read the rules with /rules.")
+        rules = group_rules.get(str(message.chat.id), "Be respectful and follow the rules.")
+        await message.reply_text(f"👋 Welcome, {new_member.first_name}!\nPlease read the rules with /rules.\n\n{rules}")
+
+@app.on_message(filters.command("setrules") & filters.group)
+async def setrules(client, message):
+    if len(message.command) < 2:
+        await message.reply_text("Usage: /setrules <rules text>")
+        return
+    new_rules = message.text.split(None, 1)[1]
+    group_rules[str(message.chat.id)] = new_rules
+    with open(RULES_FILE, "w") as f:
+        json.dump(group_rules, f)
+    await message.reply_text(f"✅ Group rules updated:\n{new_rules}")
 
 @app.on_message(filters.command("rules") & filters.group)
 async def show_rules(client, message):
-    rules = "1. Be respectful.\n2. No spam.\n3. Follow admin instructions."
+    rules = group_rules.get(str(message.chat.id), "Be respectful and follow the rules.")
     await message.reply_text(f"📜 Group Rules:\n{rules}")
 
 @app.on_message(filters.command("ban") & filters.group)
