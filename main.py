@@ -15,7 +15,6 @@ WELCOME_FILE = "welcome.json"
 WARNS_FILE = "warns.json"
 FILTERS_FILE = "filters.json"
 
-# Load or init storage
 def load_json(filename):
     if os.path.exists(filename):
         with open(filename, "r") as f:
@@ -31,22 +30,70 @@ welcome_msgs = load_json(WELCOME_FILE)
 warns = load_json(WARNS_FILE)
 filters_dict = load_json(FILTERS_FILE)
 
-# -------- RULES --------
+# ---------------- COMMANDS ----------------
+
+@app.on_message(filters.command("start"))
+async def start(client, message):
+    await message.reply("🌹 Hello! I'm your Group Manager Bot.\nType /help to see my commands.")
+
+@app.on_message(filters.command("help"))
+async def help_command(client, message):
+    text = """
+🌹 **Group Manager Bot Commands**
+
+📜 Rules:
+• /setrules <text> — Set rules
+• /rules — Show rules
+
+👋 Welcome:
+• /welcome <text> — Set welcome message
+• /disablewelcome — Disable welcome
+
+🛠 Moderation:
+• /ban — Ban user
+• /unban <user_id> — Unban user
+• /kick — Kick user
+• /mute — Mute user
+• /unmute — Unmute user
+
+⚠ Warnings:
+• /warn — Warn user
+• /warns — Show warns
+• /resetwarns — Reset warns
+
+🔍 Info & Stats:
+• /info — User info
+• /stats — Group stats
+
+💬 Filters:
+• /filter <word> <reply> — Add filter
+• /stopfilter <word> — Remove filter
+• /filters — Show filters
+
+🔔 Other:
+• /tagall — Tag all members
+• /pin — Pin message
+• /unpin — Unpin message
+• /purge — Delete messages
+"""
+    await message.reply(text)
+
+# ---------------- RULES ----------------
 @app.on_message(filters.command("setrules") & filters.group)
 async def setrules(_, m):
     if len(m.command) < 2:
-        return await m.reply("Usage: /setrules <rules>")
+        return await m.reply("Usage: /setrules <rules text>")
     text = m.text.split(None, 1)[1]
     group_rules[str(m.chat.id)] = text
     save_json(RULES_FILE, group_rules)
-    await m.reply("✅ Rules updated!")
+    await m.reply("✅ Group rules updated!")
 
 @app.on_message(filters.command("rules") & filters.group)
 async def rules(_, m):
     text = group_rules.get(str(m.chat.id), "No rules set.")
     await m.reply(f"📜 Rules:\n{text}")
 
-# -------- WELCOME --------
+# ---------------- WELCOME ----------------
 @app.on_message(filters.command("welcome") & filters.group)
 async def welcome_set(_, m):
     if len(m.command) < 2:
@@ -69,11 +116,11 @@ async def greet(_, m):
         for u in m.new_chat_members:
             await m.reply(text.replace("{first_name}", u.first_name))
 
-# -------- MODERATION --------
+# ---------------- MODERATION ----------------
 @app.on_message(filters.command("ban") & filters.group)
 async def ban(_, m):
     if not m.reply_to_message:
-        return await m.reply("Reply to ban.")
+        return await m.reply("Reply to a user's message to ban.")
     user = m.reply_to_message.from_user
     await _.ban_chat_member(m.chat.id, user.id)
     await m.reply(f"🚫 {user.mention} banned!")
@@ -81,15 +128,18 @@ async def ban(_, m):
 @app.on_message(filters.command("unban") & filters.group)
 async def unban(_, m):
     if len(m.command) < 2:
-        return await m.reply("Usage: /unban <user_id>")
-    uid = int(m.command[1])
-    await _.unban_chat_member(m.chat.id, uid)
-    await m.reply(f"✅ User {uid} unbanned!")
+        return await m.reply("Send: /unban <user_id>")
+    try:
+        user_id = int(m.command[1])
+        await _.unban_chat_member(m.chat.id, user_id)
+        await m.reply(f"✅ User {user_id} has been unbanned!")
+    except Exception as e:
+        await m.reply(f"Error: {e}")
 
 @app.on_message(filters.command("kick") & filters.group)
 async def kick(_, m):
     if not m.reply_to_message:
-        return await m.reply("Reply to kick.")
+        return await m.reply("Reply to a user's message to kick.")
     user = m.reply_to_message.from_user
     await _.ban_chat_member(m.chat.id, user.id)
     await _.unban_chat_member(m.chat.id, user.id)
@@ -98,24 +148,32 @@ async def kick(_, m):
 @app.on_message(filters.command("mute") & filters.group)
 async def mute(_, m):
     if not m.reply_to_message:
-        return await m.reply("Reply to mute.")
+        return await m.reply("Reply to a user's message to mute.")
     user = m.reply_to_message.from_user
-    await _.restrict_chat_member(m.chat.id, user.id, ChatPermissions(can_send_messages=False))
+    await _.restrict_chat_member(
+        m.chat.id,
+        user.id,
+        permissions=ChatPermissions(can_send_messages=False)
+    )
     await m.reply(f"🔇 {user.mention} muted!")
 
 @app.on_message(filters.command("unmute") & filters.group)
 async def unmute(_, m):
     if not m.reply_to_message:
-        return await m.reply("Reply to unmute.")
+        return await m.reply("Reply to a user's message to unmute.")
     user = m.reply_to_message.from_user
-    await _.restrict_chat_member(m.chat.id, user.id, ChatPermissions(can_send_messages=True))
+    await _.restrict_chat_member(
+        m.chat.id,
+        user.id,
+        permissions=ChatPermissions(can_send_messages=True)
+    )
     await m.reply(f"🔊 {user.mention} unmuted!")
 
-# -------- WARNINGS --------
+# ---------------- WARNINGS ----------------
 @app.on_message(filters.command("warn") & filters.group)
 async def warn(_, m):
     if not m.reply_to_message:
-        return await m.reply("Reply to warn.")
+        return await m.reply("Reply to a user's message to warn.")
     user = m.reply_to_message.from_user
     chat_id = str(m.chat.id)
     warns.setdefault(chat_id, {})
@@ -146,7 +204,7 @@ async def resetwarns(_, m):
     save_json(WARNS_FILE, warns)
     await m.reply(f"✅ Warns reset for {user.mention}")
 
-# -------- FILTERS --------
+# ---------------- FILTERS ----------------
 @app.on_message(filters.command("filter") & filters.group)
 async def add_filter(_, m):
     if len(m.command) < 3:
@@ -177,11 +235,12 @@ async def list_filters(_, m):
 @app.on_message(filters.text & filters.group)
 async def auto_reply(_, m):
     fl = filters_dict.get(str(m.chat.id), {})
+    text = m.text.lower()
     for word, reply in fl.items():
-        if word in m.text.lower():
+        if word in text:
             return await m.reply(reply)
 
-# -------- EXTRA --------
+# ---------------- EXTRA ----------------
 @app.on_message(filters.command("stats") & filters.group)
 async def stats(_, m):
     members = await _.get_chat_members_count(m.chat.id)
@@ -202,9 +261,12 @@ async def tagall(_, m):
     mentions = []
     async for member in _.get_chat_members(m.chat.id):
         if not member.user.is_bot:
-            mentions.append(member.user.mention)
+            if member.user.username:
+                mentions.append(f"@{member.user.username}")
+            else:
+                mentions.append(member.user.first_name)
     if mentions:
-        await m.reply(" ".join(mentions))
+        await m.reply(" ".join(mentions[:50]))
 
 @app.on_message(filters.command("pin") & filters.group)
 async def pin(_, m):
